@@ -1,0 +1,30 @@
+-*- mode: org -*-
+
+* Kindle Pull
+
+Since kindle DXG has no wifi adapter, it's unable to subscribe network
+resouce freely, such as RSS, throught @free.kindle.com. it's very
+inconvenience. I began to consider whether to simulate DXG's internal
+browser behavior to fetch some network resouces over its 3G network.
+Therefore, this project is bron.
+
+* Build
+
+Just make, then *kindlepull* will be buit out.
+
+* Installation
+
+1. ssh to your kindle system, then put *kindlepull* to anywhere,
+2. extra work: fetch your x-fsn, and build your fake Whispernet,
+3. custom kindlepull.ini, and put it to /mnt/us/kindlepull.ini.
+
+* Usage
+
+Use launchpad to call *kindlepull*, put something into your
+lauchpad.ini, for example:
+
+    Shift P = path to kindlepull
+
+* Extra
+
+You need to build a fake Whispernet to associate ... TBD
