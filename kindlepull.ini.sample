@@ -1,0 +1,3 @@
+fsn = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+whisper = http://your-fake-whisper-url/whisper/list
+log = /tmp/kindlepull.log

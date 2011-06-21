@@ -1,5 +1,5 @@
 // @(#)HttpGet.cpp
-// Time-stamp: <Julian Qian 2011-06-16 12:22:13>
+// Time-stamp: <Julian Qian 2011-06-21 23:39:26>
 // Copyright 2011 Julian Qian
 // Version: $Id: HttpGet.cpp,v 0.0 2011/06/12 05:07:03 jqian Exp $
 
@@ -26,7 +26,7 @@
 using std::string;
 
 HttpGet::HttpGet(const char* proxy, const char* fsn)
-    : sockfd_(-1), tmpfile_(NULL), fsn_(fsn) {
+    : sockfd_(-1), tmpfile_(NULL), fsn_(fsn), gzip_(false) {
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
@@ -262,7 +262,7 @@ HttpGet::request(const string& url){
     bzero(rescode,4);
     strncpy(rescode, buffer + 9, 3); // eg: HTTP/1.1 200
     // TODO: check HTTP response code 200, 403 ...
-    bool gzip = false, chunked = false;
+    bool chunked = false;
     int contentLength = 0;
     while(1){
         // delimit by \r\n
@@ -281,7 +281,7 @@ HttpGet::request(const string& url){
             if(key == "content-length"){
                 contentLength = get_content_length(value);
             }else if(key == "content-encoding"){
-                gzip = (value == "gzip") ? true : false;
+                gzip_ = (value == "gzip") ? true : false;
             }else if(key == "transfer-encoding"){
                 chunked = (value == "chunked") ? true : false;
             }else if(key == "content-disposition"){
@@ -380,16 +380,27 @@ HttpGet::request(const string& url){
 }
 
 int
-HttpGet::gunzipText(string& text){
+HttpGet::getText(string& text){
+    char buffer[1024];
+
     FILE* tmp = tmpfile();
     rewind(tmpfile_);
-    int ret = gunzip_file(tmpfile_, tmp);
-    if(ret){
-        LERROR("failed to ungzip text.\n");
+
+    int ret = 0;
+    if(gzip_){
+        ret = gunzip_file(tmpfile_, tmp);
+        if(ret){
+            LERROR("failed to ungzip text.\n");
+        }
+    }else{
+        while(!feof(tmpfile_)){
+            int rlen = fread(buffer, 1, 1024, tmpfile_);
+            // TODO: confirm write rlen
+            fwrite(buffer, 1, rlen, tmp);
+        }
     }
 
     rewind(tmp);
-    char buffer[1024];
     while(!feof(tmp)){
         int rlen = fread(buffer, 1, 1024, tmp);
         text.append(buffer, rlen);
@@ -400,7 +411,7 @@ HttpGet::gunzipText(string& text){
 }
 
 int
-HttpGet::gunzipFile(const char* file){
+HttpGet::getFile(const char* file){
 
     // read from temporay file
     rewind(tmpfile_);
@@ -411,9 +422,19 @@ HttpGet::gunzipFile(const char* file){
         return -1;
     }
 
-    int ret = gunzip_file(tmpfile_, fp);
-    if(ret){
-        LERROR("Failed to ungzip to %s\n", file);
+    int ret = 0;
+    if(gzip_){
+        ret = gunzip_file(tmpfile_, fp);
+        if(ret){
+            LERROR("Failed to ungzip to %s\n", file);
+        }
+    }else{
+        char buffer[1024];
+        while(!feof(tmpfile_)){
+            int rlen = fread(buffer, 1, 1024, tmpfile_);
+            // TODO: confirm write rlen
+            fwrite(buffer, 1, rlen, fp);
+        }
     }
 
     fclose(fp);

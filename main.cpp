@@ -1,5 +1,5 @@
 // @(#)main.cpp
-// Time-stamp: <Julian Qian 2011-06-16 12:28:35>
+// Time-stamp: <Julian Qian 2011-06-21 23:36:41>
 // Copyright 2011 Julian Qian
 // Version: $Id: main.cpp,v 0.0 2011/06/12 05:04:14 jqian Exp $
 
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]){
         string listText;
         HttpGet qlist(AMAZON_PROXY, conf.fsn.c_str());
         qlist.request(conf.whisper);
-        qlist.gunzipText(listText);
+        qlist.getText(listText);
         size_t start = 0, end;
         while(1){
             end = listText.find("\n", start);
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]){
         if(url2file(url, file) == 0){
             HttpGet hget(AMAZON_PROXY, conf.fsn.c_str());
             hget.request(url.c_str());
-            hget.gunzipFile(file.c_str());
+            hget.getFile(file.c_str());
         }
     }
 
