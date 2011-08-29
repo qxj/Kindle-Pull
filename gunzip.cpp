@@ -1055,10 +1055,8 @@ nextFile:
             /* "PK00" */
             goto nextFile;
         } else {
-            char buf[10];
-            fprintf(errfp, "Corrupted archive. Try to extract: y/n?\n");
-            fgets(buf, 9, stdin);
-            if (buf[0]=='y' || buf[0]=='Y') {
+            // corrupted archive, try to extract
+            {
                 while (1) {
                     if (tmp[0]==-1 && tmp[1]==-1 && tmp[2]==-1 && tmp[3]==-1)
                         break;
@@ -1077,11 +1075,10 @@ nextFile:
         }
     } else {
         if (oldMode != MODE_ZIP) {
-            char buf[10];
-            fprintf(errfp, "Corrupted archive. Try to extract: y/n?\n");
-            fgets(buf, 9, stdin);
-            if (buf[0]=='y' || buf[0]=='Y')
+            // corrupted archive, try to extract
+            {
                 oldMode = MODE_ZIP;
+            }
         }
         if (oldMode == MODE_ZIP) {
             fprintf(errfp, "Skipping corrupted data\n");

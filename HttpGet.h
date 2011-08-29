@@ -1,5 +1,5 @@
 /* @(#)HttpGet.h -*- mode: c++ -*-
- * Time-stamp: <Julian Qian 2011-06-21 23:36:28>
+ * Time-stamp: <Julian Qian 2011-08-29 19:05:56>
  * Copyright 2011 Julian Qian
  * Version: $Id: HttpGet.h,v 0.0 2011/06/12 05:05:46 jqian Exp $
  */
@@ -16,15 +16,15 @@ public:
     // for simple, only blocking socket
     int request(const std::string& url);
     // for content-length
-    int getText(std::string& text);
+    int gunzipText(std::string& text);
     // for chunked attachment
-    int getFile(const char* filepath);
+    int gunzipFile(const char* filedir);
 
 private:
     int sockfd_;
     FILE* tmpfile_;
-    const char* fsn_;
-    bool gzip_;
+    const char* fsn_;           // Amazon X-FSN
+    std::string attachment__;
 };
 
 #endif /* _HTTPGET_H */
