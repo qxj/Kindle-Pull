@@ -1,5 +1,5 @@
 ### Makefile ---
-## Time-stamp: <Julian Qian 2011-06-16 12:47:03>
+## Time-stamp: <Julian Qian 2011-10-29 17:34:47>
 ## Author: junist@gmail.com
 ## Version: $Id: Makefile,v 0.0 2011/06/13 04:22:13 jqian Exp $
 ## Keywords:
@@ -18,8 +18,8 @@ all: ${KINDLEPULL}
 
 test: ${TEST}
 
-KINDLEPULL_O=main.o HttpGet.o Logging.o gunzip.o
-TEST_O=test.o HttpGet.o Logging.o gunzip.o
+KINDLEPULL_O=main.o HttpGet.o Logging.o gun.o libz.a
+TEST_O=test.o HttpGet.o Logging.o gun.o libz.a
 
 
 ${KINDLEPULL}: ${KINDLEPULL_O}

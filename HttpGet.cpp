@@ -1,5 +1,5 @@
 // @(#)HttpGet.cpp
-// Time-stamp: <Julian Qian 2011-08-29 19:09:33>
+// Time-stamp: <Julian Qian 2011-10-29 19:16:04>
 // Copyright 2011 Julian Qian
 // Version: $Id: HttpGet.cpp,v 0.0 2011/06/12 05:07:03 jqian Exp $
 
@@ -15,18 +15,20 @@
 
 #include <algorithm>
 
-#include "gunzip.h"
+#include "gun.h"
 #include "Logging.h"
 #include "HttpGet.h"
 
 #define MAX_HEADER_LENGTH 1024
 #define PORT 80
 #define CRLF "\r\n"
+#define CLOSEFP(fp) if(fp){ fclose(fp); fp = NULL; }
+#define CLOSESOCK(sock) if(sock!=-1){ close(sock); sock = -1; }
 
 using std::string;
 
 HttpGet::HttpGet(const char* proxy, const char* fsn)
-    : sockfd_(-1), tmpfile_(NULL), fsn_(fsn), attachment_() {
+    : sockfd_(-1), tmpfile_(tmpfile()), fsn_(fsn), filename_(), gziped_(false) {
     struct sockaddr_in serv_addr;
     struct hostent *server;
 
@@ -56,11 +58,8 @@ HttpGet::HttpGet(const char* proxy, const char* fsn)
 }
 
 HttpGet::~HttpGet(){
-    close(sockfd_);
-    sockfd_ = -1;
-    if(tmpfile_){
-        fclose(tmpfile_);
-    }
+    CLOSESOCK(sockfd_);
+    CLOSEFP(tmpfile_);
 }
 
 static string get_hostname(const string& url){
@@ -107,84 +106,6 @@ static int get_content_length(const string& str){
     return atoi(str.c_str());
 }
 
-#if 0
-static int gunzip_text(Bytef *dest, uLongf *destLen, const Bytef *source, uLongf sourceLen){
-    z_stream strm;
-    int err;
-
-    memset(&strm, 0, sizeof strm);
-    strm.next_in = (Bytef *)source;
-    strm.avail_in = (uInt)sourceLen;
-    strm.next_out = dest;
-    strm.avail_out = (uInt)*destLen;
-
-    /* this bit is magic to do proper gunzipping */
-    err = inflateInit2(&strm, 16+MAX_WBITS);
-
-    if (err != Z_OK)
-        return err;
-
-    err = inflate(&strm, Z_FINISH);
-
-    if (err != Z_STREAM_END)
-    {
-        inflateEnd(&strm);
-        return err == Z_OK ? Z_BUF_ERROR : err;
-    }
-
-    *destLen = strm.total_out;
-
-    err = inflateEnd(&strm);
-    return err;
-}
-
-#define CHUNK 16384
-
-static int gunzip_file(FILE* dest, FILE* source){
-    z_stream strm;
-    int err, flush;
-    unsigned have;
-    unsigned char in[CHUNK];
-    unsigned char out[CHUNK];
-
-    memset(&strm, 0, sizeof strm);
-    err = inflateInit2(&strm, 16+MAX_WBITS);
-    if (err != Z_OK)
-        return err;
-
-    /* compress until end of file */
-    do {
-        strm.avail_in = fread(in, 1, CHUNK, source);
-        if (ferror(source)) {
-            (void)inflateEnd(&strm);
-            return Z_ERRNO;
-        }
-        flush = feof(source) ? Z_FINISH : Z_NO_FLUSH;
-        strm.next_in = in;
-
-        do {
-            strm.avail_out = CHUNK;
-            strm.next_out = out;
-            err = inflate(&strm, flush);    /* no bad return value */
-            assert(err != Z_STREAM_ERROR);  /* state not clobbered */
-            have = CHUNK - strm.avail_out;
-            if (fwrite(out, 1, have, dest) != have || ferror(dest)) {
-                (void)inflateEnd(&strm);
-                return Z_ERRNO;
-            }
-        } while (strm.avail_out == 0);
-        assert(strm.avail_in == 0);     /* all input will be used */
-
-        /* done when last data in file processed */
-    } while (flush != Z_FINISH);
-    assert(err == Z_STREAM_END);        /* stream will be complete */
-
-    /* clean up and return */
-    (void)inflateEnd(&strm);
-    return Z_OK;
-}
-#endif
-
 static int hex2dec(const char* str, int len){
     assert(len < 8);
     char hex[10] = "0x";
@@ -215,11 +136,20 @@ static int string_find(const char* str, int slen, const char* search, int selen)
     return -1;
 }
 
+static string basename(const string& url){
+    size_t found = url.find_last_of("/");
+    if(found != string::npos && found < url.length())
+        return url.substr(found+1);
+    LERROR("failed to strip basename from %s.", url.c_str());
+    return "Unknown";
+}
+
 int
 HttpGet::request(const string& url){
     char buffer[MAX_HEADER_LENGTH];
     int buflen;
 
+    filename_ = basename(url);
     // start to request
     //
     snprintf(buffer, MAX_HEADER_LENGTH,
@@ -262,7 +192,7 @@ HttpGet::request(const string& url){
     bzero(rescode,4);
     strncpy(rescode, buffer + 9, 3); // eg: HTTP/1.1 200
     // TODO: check HTTP response code 200, 403 ...
-    bool gzip = false, chunked = false;
+    bool chunked = false;
     int contentLength = 0;
     while(1){
         // delimit by \r\n
@@ -281,7 +211,7 @@ HttpGet::request(const string& url){
             if(key == "content-length"){
                 contentLength = get_content_length(value);
             }else if(key == "content-encoding"){
-                gzip = (value == "gzip") ? true : false;
+                gziped_ = (value == "gzip") ? true : false;
             }else if(key == "transfer-encoding"){
                 chunked = (value == "chunked") ? true : false;
             }else if(key == "content-disposition"){
@@ -293,9 +223,10 @@ HttpGet::request(const string& url){
                         end - aoff, "=", 1);
                 if(alen > 0){
                     aoff += alen;
-                    attachment_ = trim_string(buffer + aoff, end - aoff);
+                    filename_ = trim_string(buffer + aoff, end - aoff);
                 }else{
-                    attachment_ = "Unknown";
+                    LERROR("Failed to fetch attachment filename.");
+                    filename_ = "Unknown";
                 }
             }
         }
@@ -306,7 +237,6 @@ HttpGet::request(const string& url){
 
     // reterive body
     //
-    tmpfile_ = tmpfile();
     if(contentLength > 0){
         int remaining = contentLength;
         // FIXME: why rerieve different content when debug mode, if more than 1b?!
@@ -326,6 +256,7 @@ HttpGet::request(const string& url){
             }
             remaining -= fetched;
         } while(remaining > 0);
+        LINFO("fetch content length %d.", contentLength);
     }else if(chunked){
         int chunksize = 0;
         do {
@@ -378,7 +309,8 @@ HttpGet::request(const string& url){
     // restore download file
     //
 #if 0
-    FILE* fp = fopen("tmpfile.gz", "w");
+    string tmpgz = this->filename_ + ".gz";
+    FILE* fp = fopen(tmpgz.c_str(), "w");
     rewind(tmpfile_);
     while(!feof(tmpfile_)){
         int tlen = fread(buffer, 1, 1024, tmpfile_);
@@ -392,44 +324,68 @@ HttpGet::request(const string& url){
 
 int
 HttpGet::gunzipText(string& text){
-    FILE* tmp = tmpfile();
-    rewind(tmpfile_);
-    int ret = gunzip_file(tmpfile_, tmp);
-    if(ret){
-        LERROR("failed to ungzip text.\n");
-    }
+    int ret = 0;
 
-    rewind(tmp);
-    char buffer[1024];
-    while(!feof(tmp)){
-        int rlen = fread(buffer, 1, 1024, tmp);
-        text.append(buffer, rlen);
+    if(gziped_){
+        FILE* tmp = tmpfile();
+        rewind(tmpfile_);
+        ret = gunzip_file(tmpfile_, tmp);
+        if(ret){
+            LERROR("failed to ungzip text.\n");
+        }
+        rewind(tmp);
+        char buffer[1024];
+        while(!feof(tmp)){
+            int rlen = fread(buffer, 1, 1024, tmp);
+            text.append(buffer, rlen);
+        }
+        CLOSEFP(tmp);
+    }else{
+        rewind(tmpfile_);
+        char buffer[1024];
+        while(!feof(tmpfile_)){
+            int rlen = fread(buffer, 1, 1024, tmpfile_);
+            text.append(buffer, rlen);
+        }
     }
-
-    fclose(tmp);
     return ret;
 }
 
 int
 HttpGet::gunzipFile(const char* dir){
+    int ret = 0;
+
+    string file(dir);
+    file.append(filename_);
+    FILE* fp = fopen(file.c_str(), "w");
+    if(fp == NULL){
+        LERROR("failed to open %s\n", file.c_str());
+        return -1;
+    }
 
     // read from temporay file
     rewind(tmpfile_);
 
-    string file(dir);
-    file.append(attachment_);
-    FILE* fp = fopen(file, "w");
-    if(fp == NULL){
-        LERROR("failed to open %s\n", file);
-        return -1;
+    if(gziped_){
+        ret = gunzip_file(tmpfile_, fp);
+        if(ret){
+            LERROR("Failed to ungzip to %s\n", file.c_str());
+        }
+
+    }else{
+        char buffer[1024];
+        while(!feof(tmpfile_)){
+            int rlen = fread(buffer, 1, 1024, tmpfile_);
+            fwrite(buffer, 1, rlen, fp);
+        }
+        if(ferror(tmpfile_)){
+            LERROR("Failed to copy to %s\n", file.c_str());
+            ret = -1;
+        }
     }
 
-    int ret = gunzip_file(tmpfile_, fp);
-    if(ret){
-        LERROR("Failed to ungzip to %s\n", file);
-    }
-
-    fclose(fp);
+    CLOSEFP(fp);
+    if(ret) unlink(file.c_str());
 
     return ret;
 }

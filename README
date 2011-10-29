@@ -2,11 +2,14 @@
 
 * Kindle Pull
 
-Since kindle DXG has no wifi adapter, it's unable to subscribe network
-resouce freely, such as RSS, throught @free.kindle.com. it's very
-inconvenience. I began to consider whether to simulate DXG's internal
-browser behavior to fetch some network resouces over its 3G network.
-Therefore, this project is bron.
+Since kindle DXG has no WIFI adapter, you're unable to subscribe network
+resouces freely, such as RSS, throught @free.kindle.com. You will have
+to pay for your subscription. too suck!
+
+I noticed some documents, such as mobi, could be downloaded in DXG's
+inner browser. Thus, I began to consider whether it's possible to
+simulate internal browser's behavior to fetch network resouces over
+Amazon's 3G network. Therefore, this project is bron.
 
 * Build
 
@@ -20,11 +23,15 @@ Just make, then *kindlepull* will be buit out.
 
 * Usage
 
-Use launchpad to call *kindlepull*, put something into your
-lauchpad.ini, for example:
+Use launchpad to call *kindlepull*, put following command into
+=lauchpad.ini=:
 
-    Shift P = path to kindlepull
+    Shift P = /path/to/kindlepull
 
 * Extra
 
-You need to build a fake Whispernet to associate ... TBD
+You need to build a fake Whispernet to associate ...
+Refer here: https://github.com/JulQian/Fake-Whisper
+
+For more information, refer to this link:
+http://blog.jqian.net/kindle-hack.html

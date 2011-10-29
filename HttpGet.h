@@ -1,5 +1,5 @@
 /* @(#)HttpGet.h -*- mode: c++ -*-
- * Time-stamp: <Julian Qian 2011-08-29 19:05:56>
+ * Time-stamp: <Julian Qian 2011-10-29 18:19:08>
  * Copyright 2011 Julian Qian
  * Version: $Id: HttpGet.h,v 0.0 2011/06/12 05:05:46 jqian Exp $
  */
@@ -24,7 +24,8 @@ private:
     int sockfd_;
     FILE* tmpfile_;
     const char* fsn_;           // Amazon X-FSN
-    std::string attachment__;
+    std::string filename_;
+    bool gziped_;
 };
 
 #endif /* _HTTPGET_H */

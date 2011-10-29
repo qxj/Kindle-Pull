@@ -1,5 +1,5 @@
 // @(#)main.cpp
-// Time-stamp: <Julian Qian 2011-08-29 19:11:39>
+// Time-stamp: <Julian Qian 2011-10-29 20:06:35>
 // Copyright 2011 Julian Qian
 // Version: $Id: main.cpp,v 0.0 2011/06/12 05:04:14 jqian Exp $
 
@@ -13,7 +13,7 @@
 
 #define AMAZON_PROXY "fints-g7g.amazon.com"
 #define DOCUMENT_PATH "/mnt/us/documents/"
-#define CONFIG_FILE "/mnt/us/kindlepull.ini"
+#define CONFIG_FILE "kindlepull.ini"
 
 using std::string;
 
@@ -72,7 +72,9 @@ int url2file(string url, string& file){
 
 int main(int argc, char *argv[]){
     PullConfig conf;
-    if(get_config(CONFIG_FILE, conf)){
+    if(-1 == get_config(CONFIG_FILE, conf) &&
+       -1 == get_config("/mnt/us/" CONFIG_FILE, conf) &&
+       -1 == get_config("/mnt/us/kindlepull/" CONFIG_FILE, conf)){
         fprintf(stderr, "failed to load conf file.\n");
         return -1;
     }
@@ -92,19 +94,22 @@ int main(int argc, char *argv[]){
         HttpGet qlist(AMAZON_PROXY, conf.fsn.c_str());
         qlist.request(conf.whisper);
         qlist.gunzipText(listText);
+        LDEBUG("gunzipText: %s", listText.c_str());
         size_t start = 0, end;
         while(1){
             end = listText.find("\n", start);
             if(end != string::npos){
                 string line = listText.substr(start, end - start);
-                dlist.push_back(line);
+                if(line.find("http://") == 0){
+                    dlist.push_back(line);
+                }
             }else{
                 break;
             }
             start = end + 1;    // skip delimiter \n
         }
     }
-
+    LDEBUG("begin download...: %d.", dlist.size());
     // download them
     for (DownloadList::iterator itr = dlist.begin();
          itr != dlist.end(); ++itr) {
