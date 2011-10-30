@@ -1,5 +1,5 @@
 // @(#)HttpGet.cpp
-// Time-stamp: <Julian Qian 2011-10-29 19:16:04>
+// Time-stamp: <Qian Julian 2011-10-30 11:17:51>
 // Copyright 2011 Julian Qian
 // Version: $Id: HttpGet.cpp,v 0.0 2011/06/12 05:07:03 jqian Exp $
 
@@ -222,7 +222,7 @@ HttpGet::request(const string& url){
                 int alen = string_find(buffer + aoff,
                         end - aoff, "=", 1);
                 if(alen > 0){
-                    aoff += alen;
+                    aoff += (alen + 1);
                     filename_ = trim_string(buffer + aoff, end - aoff);
                 }else{
                     LERROR("Failed to fetch attachment filename.");
