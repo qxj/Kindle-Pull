@@ -1,8 +1,14 @@
 // @(#)main.cpp
-// Time-stamp: <Julian Qian 2011-10-29 20:06:35>
+// Time-stamp: <Julian Qian 2011-10-31 21:12:44>
 // Copyright 2011 Julian Qian
 // Version: $Id: main.cpp,v 0.0 2011/06/12 05:04:14 jqian Exp $
 
+
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 #include <vector>
 #include <fstream>
@@ -14,6 +20,7 @@
 #define AMAZON_PROXY "fints-g7g.amazon.com"
 #define DOCUMENT_PATH "/mnt/us/documents/"
 #define CONFIG_FILE "kindlepull.ini"
+#define PID_FILE "/tmp/kindlepull.pid"
 
 using std::string;
 
@@ -70,7 +77,49 @@ int url2file(string url, string& file){
     return -1;
 }
 
+static int lock_file(int fd){
+    struct flock fl;
+    fl.l_type = F_WRLCK;
+    fl.l_start = 0;
+    fl.l_whence = SEEK_SET;
+    fl.l_len = 0;
+    return fcntl(fd, F_SETLK, (long)&fl);
+}
+
+static int already_running(void){
+    int fd = open(PID_FILE, O_RDWR|O_CREAT,
+                  S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    if(fd < 0){
+        fprintf(stderr, "Can't open %s: %s.\n", PID_FILE, strerror(errno));
+        _exit(1);
+    }
+
+    if(lock_file(fd) < 0){
+        if (errno == EACCES || errno == EAGAIN){
+            close(fd);
+            fprintf(stderr, "Another instance is running?\n");
+            _exit(1);
+        }
+        fprintf(stderr, "Can't lock %s: %s.\n", PID_FILE, strerror(errno));
+        _exit(1);
+    }
+
+    int rval = ftruncate(fd,0);
+
+    char buf[16];
+    sprintf(buf,"%d", getpid());
+    rval = write(fd, buf, strlen(buf));
+    if(rval < 0){
+        close(fd);
+        fprintf(stderr, "Failed to write pid to %s.\n", PID_FILE);
+        _exit(1);
+    }
+    return fd;
+}
+
 int main(int argc, char *argv[]){
+    int lockfd = already_running();
+
     PullConfig conf;
     if(-1 == get_config(CONFIG_FILE, conf) &&
        -1 == get_config("/mnt/us/" CONFIG_FILE, conf) &&
@@ -82,6 +131,7 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "please set fsn and whisper url.\n");
         return -1;
     }
+
     Logger::instance()->level(Logger::DEBUG_LEVEL);
     if(!conf.log.empty()){
         Logger::instance()->open(conf.log);
@@ -120,6 +170,10 @@ int main(int argc, char *argv[]){
         hget.request(url.c_str());
         hget.gunzipFile(DOCUMENT_PATH);
     }
+
+    // release lock file
+    close(lockfd);
+    unlink(PID_FILE);
 
     return 0;
 }
