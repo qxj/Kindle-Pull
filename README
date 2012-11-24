@@ -26,7 +26,7 @@ Just make, then *kindlepull* will be buit out.
 Use launchpad to call *kindlepull*, put following command into
 =lauchpad.ini=:
 
-    Shift P = /path/to/kindlepull
+    Shift P = !/path/to/kindlepull
 
 * Extra
 
